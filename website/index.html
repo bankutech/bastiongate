@@ -1,0 +1,918 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>BastionGate — Gym access that works without the internet</title>
+<meta name="description" content="Offline-first biometric access control, attendance and autonomous billing for gyms. Runs seven days dark with sub-15ms cryptographic turnstile leases.">
+<meta name="theme-color" content="#0A0A0C">
+<meta name="api-url" content="">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230A0A0C'/%3E%3Cpath d='M8 12h16v12H8z' fill='none' stroke='%23C6F432' stroke-width='2.5' stroke-linejoin='round'/%3E%3Ccircle cx='16' cy='18' r='2' fill='%23C6F432'/%3E%3Cpath d='M11 12V9a5 5 0 0 1 10 0v3' fill='none' stroke='%23C6F432' stroke-width='2.5' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta property="og:title" content="BastionGate — Offline-First Biometric Gym Access">
+<meta property="og:description" content="Commercial gym turnstiles that never stop when broadband dies. Runs 7 days dark with sub-15ms local cryptographic leases.">
+<meta property="og:image" content="assets/turnstile-hero.jpg">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="BastionGate — Offline-First Biometric Gym Access">
+<meta name="twitter:description" content="Commercial gym turnstiles that never stop when broadband dies. Runs 7 days dark with sub-15ms local cryptographic leases.">
+<meta name="twitter:image" content="assets/turnstile-hero.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=Plus+Jakarta+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0A0A0C; --fg:#F4F3EF; --mute:rgba(244,243,239,.62); --line:rgba(244,243,239,.12);
+  --card:#111114; --lime:#C6F432; --lime-ink:#0A0A0C; --lime-text:#C6F432; --burnt:#E8590C;
+  --display:'Syne','Arial Black',sans-serif; --sans:'Plus Jakarta Sans',system-ui,sans-serif; --mono:'JetBrains Mono',ui-monospace,monospace;
+  color-scheme:dark;
+  box-sizing:border-box; padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+}
+@media (prefers-color-scheme:light){
+  :root:not([data-theme="dark"]){--bg:#F4F3EF;--fg:#0A0A0C;--mute:rgba(10,10,12,.64);--line:rgba(10,10,12,.14);--card:#ECEAE3;--lime-text:#3F5200;color-scheme:light}
+}
+:root[data-theme="light"]{--bg:#F4F3EF;--fg:#0A0A0C;--mute:rgba(10,10,12,.64);--line:rgba(10,10,12,.14);--card:#ECEAE3;--lime-text:#3F5200;color-scheme:light}
+:root[data-theme="dark"]{--bg:#0A0A0C;--fg:#F4F3EF;--mute:rgba(244,243,239,.62);--line:rgba(244,243,239,.12);--card:#111114;--lime-text:#C6F432;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px);-webkit-text-size-adjust:100%}
+@media(prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font:400 16px/1.6 var(--sans);overflow-x:hidden}
+body::after{content:"";position:fixed;inset:0;pointer-events:none;z-index:50;opacity:.07;mix-blend-mode:overlay;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--lime);outline-offset:3px}
+.wrap{width:min(1180px,100% - 2.5rem);margin-inline:auto}
+
+.top{display:flex;justify-content:space-between;align-items:center;padding:1.25rem 0;border-bottom:1px solid var(--line)}
+.logo{font:800 1.35rem/1 var(--display);text-decoration:none;letter-spacing:-.02em}
+.top nav{display:flex;gap:1.5rem;align-items:center;font-size:.9rem}
+.top nav a{text-decoration:none;color:var(--mute)}
+.top nav a:hover{color:var(--fg)}
+.btn{display:inline-block;background:var(--lime);color:var(--lime-ink)!important;font-weight:600;padding:.8rem 1.3rem;border-radius:999px;text-decoration:none;transition:transform .2s}
+.btn:hover{transform:translateY(-2px)}
+@media(max-width:640px){
+  .wrap{width:min(1180px,100% - 1.5rem)}
+  .top{padding:.9rem 0;gap:.5rem}
+  .top nav{gap:.5rem}
+  .top nav a:not(.btn){display:none}
+  .top .btn{padding:.5rem .9rem;font-size:.85rem}
+  .mode{padding:.4rem .7rem;font-size:.8rem}
+  .hero{padding:2.5rem 0 2rem}
+  .hero h1{font-size:clamp(1.95rem,8vw,2.75rem);line-height:.96;max-width:100%}
+  .hero p.lede{font-size:1rem;margin-top:1.2rem}
+  .hero .row{margin-top:1.4rem;gap:.75rem}
+  .hero .btn{padding:.7rem 1.2rem;font-size:.9rem}
+  .pull{margin-top:2.5rem;padding:1.25rem 1rem}
+  .days{gap:4px;margin:1.25rem 0 .5rem}
+  .days i{height:38px}
+  .readout{grid-template-columns:repeat(3,1fr);gap:.5rem;margin-top:1rem}
+  .readout b{font-size:1.5rem}
+  .readout span{font-size:.72rem}
+  #verdict{margin-top:1rem;font-size:.88rem;min-height:3.6em}
+  .marquee{margin:2.5rem 0}
+  .marquee div{gap:2rem;padding:.9rem 0;font-size:1.15rem}
+  .bento{gap:10px}
+  .bento article{padding:1.25rem}
+  .big{font-size:clamp(2.8rem,11vw,3.8rem)}
+  .how{padding:3.5rem 0 2rem;gap:2rem}
+  .how h2{font-size:clamp(1.75rem,6.5vw,2.4rem)}
+  .how ol{gap:1.25rem}
+  .end{padding:3.5rem 0 2rem;margin-top:2rem}
+  .end h2{font-size:clamp(1.9rem,7.5vw,2.8rem);line-height:1;max-width:100%;margin-bottom:1.5rem}
+  .demo button{width:100%;text-align:center;justify-self:stretch}
+  .matrix-grid{grid-template-columns:1fr}
+  .sec-head{flex-direction:column;align-items:flex-start}
+  .scenario-btns{gap:.35rem}
+  .scen-btn{width:100%;text-align:left}
+  .gal-img-wrap{height:200px}
+  .turnstile-view{height:200px}
+  footer{flex-direction:column;gap:.5rem;text-align:center}
+}
+
+.hero{padding:clamp(3rem,9vw,7rem) 0 3rem}
+.hero h1{font:800 clamp(2.9rem,9.4vw,8.4rem)/.92 var(--display);letter-spacing:-.045em;max-width:12ch}
+.hero p.lede{font-size:clamp(1.05rem,2vw,1.3rem);color:var(--mute);max-width:46ch;margin-top:1.75rem}
+.hero .row{display:flex;gap:1rem;flex-wrap:wrap;margin-top:2rem;align-items:center}
+.ghost{color:var(--fg);text-underline-offset:4px}
+.mode{background:none;border:1px solid var(--line);color:var(--fg);font:500 .85rem var(--sans);padding:.45rem .9rem;border-radius:999px;cursor:pointer}
+.mode:hover{border-color:var(--fg)}
+.pull,.bento article{transform-style:preserve-3d}
+.btn:active{transform:scale(.97)}
+
+.pull{margin-top:4rem;border:1px solid var(--line);border-radius:6px;padding:clamp(1.25rem,3vw,2.25rem);background:var(--card)}
+.pull h2{font:600 1.1rem/1.3 var(--display)}
+.pull .sub{color:var(--mute);font-size:.9rem;margin-top:.25rem}
+.days{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin:1.5rem 0 .75rem}
+.days i{height:54px;border:1px solid var(--line);border-radius:3px;transition:background .25s,border-color .25s}
+.days i.on{background:var(--lime);border-color:var(--lime)}
+.days i.dead{background:var(--burnt);border-color:var(--burnt)}
+input[type=range]{width:100%;accent-color:var(--lime);height:28px}
+.readout{display:grid;gap:1rem;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:1rem}
+.readout b{display:block;font:800 2.4rem/1 var(--display);letter-spacing:-.03em}
+.readout span{font-size:.85rem;color:var(--mute)}
+#verdict{margin-top:1.25rem;font-weight:500;min-height:3em}
+
+.marquee{border-block:1px solid var(--line);margin:4rem 0;overflow:hidden;white-space:nowrap}
+.marquee div{display:inline-flex;gap:3rem;padding:1.2rem 0;font:600 1.4rem var(--display);color:var(--mute);will-change:transform}
+
+.bento{display:grid;grid-template-columns:repeat(6,1fr);gap:12px}
+.bento article{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1.6rem;display:flex;flex-direction:column;gap:.7rem;min-width:0}
+.bento h3{font:800 clamp(1.4rem,2.4vw,2rem)/1.05 var(--display);letter-spacing:-.025em}
+.bento p{color:var(--mute);font-size:.95rem;max-width:52ch}
+.s4{grid-column:span 4}.s3{grid-column:span 3}.s2{grid-column:span 2}
+.big{font:800 clamp(4rem,10vw,8rem)/.9 var(--display);letter-spacing:-.05em;color:var(--lime-text)}
+.lime{background:var(--lime)!important;border-color:var(--lime)!important}
+.lime h3,.lime p{color:var(--lime-ink)}
+.lime p{opacity:.78}
+pre{font:400 .78rem/1.65 var(--mono);color:var(--mute);overflow-x:auto;padding:.25rem 0}
+pre em{font-style:normal;color:var(--lime-text)}
+@media(max-width:860px){.s4,.s3,.s2{grid-column:span 6}.gallery{grid-template-columns:1fr}.sim-grid{grid-template-columns:1fr}.matrix-grid{grid-template-columns:repeat(2,1fr)}}
+
+.gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:3.5rem 0 2rem;contain:content}
+.gal-card{background:var(--card);border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;flex-direction:column;transition:transform .3s,border-color .3s;position:relative}
+.gal-card:hover{border-color:var(--lime);transform:translateY(-4px)}
+.gal-img-wrap{position:relative;width:100%;height:240px;aspect-ratio:16/10;overflow:hidden;background:#060608}
+.gal-img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .6s ease;filter:contrast(1.06) brightness(.96)}
+.gal-card:hover .gal-img{transform:scale(1.04)}
+.gal-overlay{position:absolute;inset:0;background:linear-gradient(180deg,transparent 60%,rgba(10,10,12,.85) 100%)}
+.gal-body{padding:1.4rem;display:flex;flex-direction:column;gap:.6rem;flex:1}
+.gal-tag{font:600 .75rem var(--mono);color:var(--lime-text);letter-spacing:.08em;text-transform:uppercase}
+.gal-body h3{font:700 1.25rem/1.2 var(--display);letter-spacing:-.02em}
+.gal-body p{color:var(--mute);font-size:.88rem;line-height:1.55}
+.gal-chips{display:flex;gap:.4rem;flex-wrap:wrap;margin-top:auto;padding-top:.9rem;border-top:1px solid var(--line)}
+.gal-chip{font:500 .72rem var(--mono);background:rgba(244,243,239,.06);padding:.2rem .55rem;border-radius:4px;color:var(--fg)}
+
+.turnstile-sim{margin:4.5rem 0 2.5rem;border:1px solid var(--line);border-radius:8px;background:var(--card);padding:clamp(1.25rem,3.5vw,2.5rem);contain:content}
+.sec-head{display:flex;justify-content:space-between;align-items:flex-end;flex-wrap:wrap;gap:1rem;margin-bottom:2rem}
+.sec-head h2{font:800 clamp(1.8rem,4.5vw,3rem)/1 var(--display);letter-spacing:-.03em}
+.sec-head p{color:var(--mute);font-size:.95rem;max-width:54ch}
+.sim-grid{display:grid;grid-template-columns:1fr 1.3fr;gap:2rem;align-items:start}
+
+.lane-stage{background:rgba(10,10,12,.6);border:1px solid var(--line);border-radius:6px;padding:1.5rem;position:relative;overflow:hidden}
+.lane-telemetry-badge{display:flex;justify-content:space-between;align-items:center;font:600 .78rem var(--mono);padding-bottom:.8rem;border-bottom:1px solid var(--line);margin-bottom:1.5rem}
+.relay-pill{padding:.2rem .6rem;border-radius:999px;font-size:.72rem;background:rgba(244,243,239,.08);color:var(--mute);transition:all .25s}
+.relay-pill.pulse{background:var(--lime);color:var(--lime-ink);font-weight:700}
+.relay-pill.locked{background:var(--burnt);color:#fff}
+
+.turnstile-view{display:flex;justify-content:center;align-items:center;height:240px;position:relative;perspective:800px;background:radial-gradient(circle at center, rgba(198,244,50,.06) 0%, transparent 70%)}
+.stanchion{width:70px;height:180px;background:linear-gradient(180deg,#24242B 0%,#141418 100%);border:1px solid rgba(244,243,239,.2);border-radius:8px;position:relative;display:flex;flex-direction:column;align-items:center;padding:10px 6px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.stanchion.left{border-top-right-radius:2px;border-bottom-right-radius:2px}
+.stanchion.right{border-top-left-radius:2px;border-bottom-left-radius:2px}
+.pod-lens{width:36px;height:36px;border-radius:50%;background:#0A0A0C;border:2px solid var(--line);position:relative;display:flex;justify-content:center;align-items:center;margin-bottom:12px;transition:border-color .3s,box-shadow .3s}
+.pod-lens::after{content:"";width:12px;height:12px;border-radius:50%;background:var(--line);transition:background .3s}
+.pod-lens.active-green{border-color:var(--lime);box-shadow:0 0 16px var(--lime)}
+.pod-lens.active-green::after{background:var(--lime)}
+.pod-lens.active-red{border-color:var(--burnt);box-shadow:0 0 16px var(--burnt)}
+.pod-lens.active-red::after{background:var(--burnt)}
+.pod-lens.active-amber{border-color:#F59F00;box-shadow:0 0 16px #F59F00}
+.pod-lens.active-amber::after{background:#F59F00}
+
+.stanchion-line{width:2px;height:70px;background:var(--line);border-radius:1px}
+.lane-passage{width:130px;height:160px;position:relative;display:flex;justify-content:center;align-items:center}
+.glass-wing{position:absolute;width:60px;height:130px;background:linear-gradient(135deg,rgba(198,244,50,.15),rgba(255,255,255,.05));border:1px solid rgba(198,244,50,.4);border-radius:4px;backdrop-filter:blur(2px);transition:transform .45s cubic-bezier(.2,1,.3,1),border-color .3s,background .3s}
+.glass-wing.left-wing{left:0;transform-origin:left center}
+.glass-wing.right-wing{right:0;transform-origin:right center}
+.glass-wing.open-left{transform:rotateY(-75deg);border-color:var(--lime);background:rgba(198,244,50,.25)}
+.glass-wing.open-right{transform:rotateY(75deg);border-color:var(--lime);background:rgba(198,244,50,.25)}
+.glass-wing.lock-deny{border-color:var(--burnt);background:rgba(232,89,12,.2)}
+
+.lane-caption{text-align:center;font:600 .85rem var(--mono);margin-top:1.2rem;min-height:1.5em;color:var(--fg)}
+
+.telemetry-board{display:flex;flex-direction:column;gap:.7rem}
+.check-item{display:flex;justify-content:space-between;align-items:center;background:rgba(10,10,12,.4);border:1px solid var(--line);border-radius:6px;padding:.8rem 1rem;gap:.75rem}
+.check-info{display:flex;flex-direction:column;gap:.15rem}
+.check-name{font:600 .82rem var(--mono);color:var(--fg)}
+.check-desc{font:400 .75rem var(--sans);color:var(--mute)}
+.check-badge{font:700 .72rem var(--mono);padding:.2rem .55rem;border-radius:4px;white-space:nowrap;transition:all .25s}
+.badge-pass{background:rgba(198,244,50,.15);color:var(--lime-text);border:1px solid rgba(198,244,50,.4)}
+.badge-warn{background:rgba(245,159,0,.15);color:#F59F00;border:1px solid rgba(245,159,0,.4)}
+.badge-fail{background:rgba(232,89,12,.15);color:var(--burnt);border:1px solid rgba(232,89,12,.4)}
+
+.scenario-btns{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1.2rem}
+.scen-btn{background:none;border:1px solid var(--line);color:var(--fg);font:500 .8rem var(--mono);padding:.45rem .85rem;border-radius:6px;cursor:pointer;transition:all .2s}
+.scen-btn:hover{border-color:var(--fg)}
+.scen-btn.active{background:var(--lime);color:var(--lime-ink);border-color:var(--lime);font-weight:700}
+
+.fleet-radar{margin:4.5rem 0 2.5rem;contain:content}
+.radar-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;margin-top:1.5rem}
+.radar-card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1.2rem;display:flex;flex-direction:column;gap:.5rem;position:relative}
+.radar-status{display:flex;justify-content:space-between;align-items:center;font:600 .72rem var(--mono)}
+.status-dot{width:8px;height:8px;border-radius:50%;display:inline-block;margin-right:6px}
+.dot-online{background:var(--lime);box-shadow:0 0 8px var(--lime)}
+.dot-offline{background:#F59F00;box-shadow:0 0 8px #F59F00}
+.dot-sync{background:#38D9A9;box-shadow:0 0 8px #38D9A9}
+.radar-city{font:700 1rem var(--display);letter-spacing:-.01em}
+.radar-meta{font:400 .78rem var(--mono);color:var(--mute);line-height:1.5}
+
+.hardware-matrix{margin:4.5rem 0 2.5rem;contain:content}
+.matrix-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:1.5rem}
+.matrix-card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1.4rem;display:flex;flex-direction:column;gap:.6rem}
+.matrix-card h3{font:700 1.15rem var(--display);letter-spacing:-.02em}
+.matrix-card ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:.45rem}
+.matrix-card li{font:400 .82rem/1.4 var(--sans);color:var(--mute);border-bottom:1px solid rgba(244,243,239,.06);padding-bottom:.35rem}
+.matrix-card li b{color:var(--fg);font-family:var(--mono);font-size:.78rem;display:block}
+
+.how{padding:6rem 0 3rem;display:grid;grid-template-columns:1fr 1fr;gap:3rem}
+.how h2{font:800 clamp(2rem,5vw,3.6rem)/1 var(--display);letter-spacing:-.035em}
+.how ol{list-style:none;padding:0;display:grid;gap:1.6rem}
+.how li{border-top:1px solid var(--line);padding-top:1rem}
+.how li b{font:600 1.1rem var(--display);display:block;margin-bottom:.25rem}
+.how li span{color:var(--mute);font-size:.95rem}
+@media(max-width:760px){.how{grid-template-columns:1fr}}
+
+.end{padding:5rem 0 3rem;border-top:1px solid var(--line);margin-top:3rem}
+.end h2{font:800 clamp(2.4rem,8vw,6.5rem)/.95 var(--display);letter-spacing:-.04em;max-width:14ch;margin-bottom:2rem}
+.demo{display:grid;gap:.75rem;max-width:520px;margin-bottom:3rem}
+.demo input,.demo textarea{width:100%;background:var(--card);border:1px solid var(--line);color:var(--fg);font:inherit;padding:.85rem 1rem;border-radius:6px}
+.demo input:focus,.demo textarea:focus{border-color:var(--lime);outline:none}
+.demo .hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.demo button{justify-self:start;border:0;font:inherit;font-weight:600;cursor:pointer}
+#demo-msg{min-height:1.5em;color:var(--mute);font-size:.9rem}
+footer{display:flex;justify-content:space-between;flex-wrap:wrap;gap:1rem;padding:2rem 0 3rem;color:var(--mute);font-size:.85rem}
+.w{display:inline-block;overflow:hidden;vertical-align:top;padding-bottom:.08em;margin-bottom:-.08em}
+.w>span{display:inline-block}
+.cur{position:fixed;left:0;top:0;width:44px;height:44px;margin:-22px 0 0 -22px;border:1px solid var(--lime);border-radius:50%;pointer-events:none;z-index:60;opacity:0;transition:width .25s,height .25s,margin .25s,background .25s}
+.cur.hot{width:72px;height:72px;margin:-36px 0 0 -36px;background:rgba(198,244,50,.16)}
+@media(hover:none),(pointer:coarse){.cur{display:none}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}.cur{display:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <a class="logo" href="#">BastionGate</a>
+    <nav><a href="#hardware">Hardware</a><a href="#simulator">Relay Sim</a><a href="#fleet">Fleet Radar</a><a href="#specs">Specs</a><a href="#grid">Inside</a><button class="mode" id="mode" type="button" aria-label="Switch colour theme">Light</button><a class="btn" href="#demo">Book a demo</a></nav>
+  </header>
+
+  <section class="hero">
+    <h1>The internet died. Your doors still know who paid.</h1>
+    <p class="lede">Access control, attendance and billing for commercial gyms where Wi-Fi is a rumor. It runs seven days dark. And it locks out the people who stopped paying, all on its own.</p>
+    <div class="row"><a class="btn" href="#demo">Book a demo</a><a class="ghost" href="#grid">See what’s inside</a></div>
+
+    <div class="pull">
+      <h2>Pull the plug</h2>
+      <p class="sub">Drag it. Example gym, about 180 punches a day.</p>
+      <div class="days" id="days" aria-hidden="true"></div>
+      <input id="slider" type="range" min="0" max="8" value="3" aria-label="Days without internet">
+      <div class="readout">
+        <div><b id="r-days">3</b><span>days offline</span></div>
+        <div><b id="r-queue">540</b><span>punches queued locally</span></div>
+        <div><b id="r-doors">Open</b><span>for paid members</span></div>
+      </div>
+      <p id="verdict"></p>
+    </div>
+  </section>
+</div>
+
+<div class="marquee" aria-hidden="true"><div>
+  <span>eSSL</span><span>ZKTeco</span><span>Hikvision</span><span>Matrix COSEC</span><span>Mantra MFS100</span><span>SecuGen</span><span>Any turnstile with a relay</span>
+  <span>eSSL</span><span>ZKTeco</span><span>Hikvision</span><span>Matrix COSEC</span><span>Mantra MFS100</span><span>SecuGen</span><span>Any turnstile with a relay</span>
+</div></div>
+
+<main class="wrap">
+  <section class="gallery" id="hardware">
+    <article class="gal-card">
+      <div class="gal-img-wrap">
+        <img class="gal-img" src="assets/turnstile-hero.jpg" alt="BastionGate Dual-Lane Optical Speed Gates" width="600" height="375" loading="lazy" decoding="async">
+        <div class="gal-overlay"></div>
+      </div>
+      <div class="gal-body">
+        <span class="gal-tag">Turnstile Node 01</span>
+        <h3>Dual-Lane Optical Speed Gates</h3>
+        <p>Tempered optical glass barriers powered by sub-millisecond brushless servos. Integrated infrared facial geometry and palm vein reader pod.</p>
+        <div class="gal-chips">
+          <span class="gal-chip">250ms Relay</span>
+          <span class="gal-chip">50 Scans/Min</span>
+          <span class="gal-chip">IP65 Brushed Titanium</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="gal-card">
+      <div class="gal-img-wrap">
+        <img class="gal-img" src="assets/edge-controller.jpg" alt="BastionGate Industrial Edge Controller" width="600" height="375" loading="lazy" decoding="async">
+        <div class="gal-overlay"></div>
+      </div>
+      <div class="gal-body">
+        <span class="gal-tag">Controller Node 02</span>
+        <h3>BastionGate Edge Master Unit</h3>
+        <p>Hardened DIN-rail edge processor running local SQLite audit logs and monotonic HWM clocks. Evaluates Ed25519 cryptographic leases with zero cloud connectivity.</p>
+        <div class="gal-chips">
+          <span class="gal-chip">Dual Gigabit NICs</span>
+          <span class="gal-chip">Wiegand / OSDP v2</span>
+          <span class="gal-chip">100% Offline Vault</span>
+        </div>
+      </div>
+    </article>
+
+    <article class="gal-card">
+      <div class="gal-img-wrap">
+        <img class="gal-img" src="assets/mobile-pass.jpg" alt="BastionGate Offline Mobile Pass" width="600" height="375" loading="lazy" decoding="async">
+        <div class="gal-overlay"></div>
+      </div>
+      <div class="gal-body">
+        <span class="gal-tag">Member Pass 03</span>
+        <h3>Offline Cryptographic Pass</h3>
+        <p>Dynamic Ed25519 member credential rendered as high-density 2D matrix or NFC token. Evaluated directly at the turnstile scanner without cellular or gym Wi-Fi.</p>
+        <div class="gal-chips">
+          <span class="gal-chip">Monotonic Nonces</span>
+          <span class="gal-chip">Zero Replay Attack</span>
+          <span class="gal-chip">NFC + Dynamic Barcode</span>
+        </div>
+      </div>
+    </article>
+  </section>
+
+  <section class="bento" id="grid">
+    <article class="s4 lime">
+      <span class="big" style="color:var(--lime-ink)">7 days</span>
+      <h3>Dark is fine.</h3>
+      <p>The front desk keeps checking people in, taking payments and logging every punch. When the line comes back, it all syncs in batches. Nothing’s lost. Nothing’s counted twice.</p>
+    </article>
+    <article class="s2">
+      <h3>Signed, not stored.</h3>
+      <p>Access runs on time-bound leases signed in the cloud with a key that never leaves a hardware module. The gym PC only holds the public half. Edit the database all you like. It won’t open a door.</p>
+    </article>
+
+    <article class="s2">
+      <h3>The turnstile remembers.</h3>
+      <p>Expiry dates get written into the terminal’s own memory. Yank the Ethernet cable and the hardware still shuts the door on time.</p>
+    </article>
+    <article class="s4">
+      <h3>Five checks on every scan.</h3>
+      <p>Signature valid. Clock hasn’t rolled back. Gym lease alive. Member lease alive. Dues paid, or inside the deadline. Fail one and the scan’s rejected, logged, and flashed on the reception screen.</p>
+<pre>{
+  "subject_type": "MEMBER",
+  "valid_until": "2026-10-31T23:59:59Z",
+  "grace_period_hours": <em>48</em>,
+  "balance_due_paise": 0,
+  "status": "ACTIVE",
+  "monotonic_nonce": <em>18</em>
+}</pre>
+    </article>
+
+    <article class="s3">
+      <h3>Exit’s always free.</h3>
+      <p>Membership lapses while someone’s mid-workout? The exit gate opens. The entry reader just won’t let them back in. No one gets trapped inside.</p>
+    </article>
+    <article class="s3">
+      <h3>Money splits &amp; syncs via phone.</h3>
+      <p>UPI Autopay and cards run through Razorpay Route. Payment fails while gym Wi-Fi is dead? The member’s phone gets a signed 48-hour grace lease over 5G and hands it to the offline gate via QR/NFC scan. No internet needed at the door.</p>
+    </article>
+
+    <article class="s2">
+      <h3>Clock tricks fail.</h3>
+      <p>Time is tracked in three places at once. If they disagree by ten minutes, the system locks and tells us.</p>
+    </article>
+    <article class="s2">
+      <h3>No rip-and-replace.</h3>
+      <p>Keep your existing &#8377;1.5L turnstiles. The BastionGate DIN-rail Edge Unit drops right in front of your eSSL, ZKTeco, or Hikvision relay wires in 20 minutes.</p>
+    </article>
+    <article class="s2">
+      <h3>Helpdesk built in.</h3>
+      <p>Receptionist logs a ticket offline. It queues, then ships with connection diagnostics attached.</p>
+    </article>
+  </section>
+
+  <section class="turnstile-sim" id="simulator">
+    <div class="sec-head">
+      <div>
+        <h2>Test the Access Engine.</h2>
+        <p>Trigger live scan scenarios against our 5-stage cryptographic decision circuit and watch the physical barrier react in real time.</p>
+      </div>
+      <div class="relay-pill" id="relay-indicator">RELAY 1: ARMED (READY)</div>
+    </div>
+
+    <div class="sim-grid">
+      <div class="lane-stage">
+        <div class="lane-telemetry-badge">
+          <span>STANCHION #LANE-01</span>
+          <span id="scan-latency" style="color:var(--lime-text)">14.2ms</span>
+        </div>
+
+        <div class="turnstile-view">
+          <div class="stanchion left">
+            <div class="pod-lens active-green" id="pod-lens"></div>
+            <div class="stanchion-line"></div>
+          </div>
+          <div class="lane-passage">
+            <div class="glass-wing left-wing open-left" id="wing-left"></div>
+            <div class="glass-wing right-wing open-right" id="wing-right"></div>
+          </div>
+          <div class="stanchion right">
+            <div class="pod-lens active-green" id="pod-lens-r"></div>
+            <div class="stanchion-line"></div>
+          </div>
+        </div>
+
+        <div class="lane-caption" id="lane-caption">PASSAGE GRANTED: Barrier Open</div>
+
+        <div class="scenario-btns">
+          <button class="scen-btn active" data-scenario="valid">🟢 Paid Member</button>
+          <button class="scen-btn" data-scenario="grace">🟡 +36h Grace Period</button>
+          <button class="scen-btn" data-scenario="expired">🔴 +50h Overdue Dues</button>
+          <button class="scen-btn" data-scenario="rollback">⚠️ Clock Rollback Attack</button>
+          <button class="scen-btn" data-scenario="offline">⚡ Day 5 Dark Mode</button>
+        </div>
+      </div>
+
+      <div class="telemetry-board">
+        <div class="check-item">
+          <div class="check-info">
+            <span class="check-name">1. ED25519_SIGNATURE</span>
+            <span class="check-desc" id="c1-desc">Matches cloud public key (64-byte Ed25519)</span>
+          </div>
+          <span class="check-badge badge-pass" id="c1-badge">VERIFIED</span>
+        </div>
+
+        <div class="check-item">
+          <div class="check-info">
+            <span class="check-name">2. CLOCK_MONOTONIC_HWM</span>
+            <span class="check-desc" id="c2-desc">Terminal clock &gt;= HWM timestamp; anti-rollback clear</span>
+          </div>
+          <span class="check-badge badge-pass" id="c2-badge">VERIFIED</span>
+        </div>
+
+        <div class="check-item">
+          <div class="check-info">
+            <span class="check-name">3. FACILITY_MASTER_LEASE</span>
+            <span class="check-desc" id="c3-desc">Facility lease active; monotonic nonce verified</span>
+          </div>
+          <span class="check-badge badge-pass" id="c3-badge">ACTIVE</span>
+        </div>
+
+        <div class="check-item">
+          <div class="check-info">
+            <span class="check-name">4. MEMBER_GRACE_WINDOW</span>
+            <span class="check-desc" id="c4-desc">Subscription valid; 0h penalty applied</span>
+          </div>
+          <span class="check-badge badge-pass" id="c4-badge">CLEARED</span>
+        </div>
+
+        <div class="check-item">
+          <div class="check-info">
+            <span class="check-name">5. RAZORPAY_ROUTE_LEDGER</span>
+            <span class="check-desc" id="c5-desc">Autonomous split confirmed; zero balance overdue</span>
+          </div>
+          <span class="check-badge badge-pass" id="c5-badge">SETTLED</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="how" id="how">
+    <h2>The desk app asks. The service decides.</h2>
+    <ol>
+      <li><b>Flutter on the front desk</b><span>Members, enquiries, payments, live attendance. It only shows things. It can’t grant access.</span></li>
+      <li><b>A Windows service under the hood</b><span>Verifies leases, talks to the terminals, keeps the encrypted local database and the append-only audit log.</span></li>
+      <li><b>One portal for us</b><span>Fleet heartbeats, tamper alerts, outbox backlogs, mandates and emergency revocation. We see every gym that’s gone quiet.</span></li>
+    </ol>
+  </section>
+
+  <section class="fleet-radar" id="fleet">
+    <div class="sec-head">
+      <div>
+        <h2>Sovereign Fleet Telemetry.</h2>
+        <p>Live health, monotonic high-water marks, and local outbox audits from active commercial deployments.</p>
+      </div>
+      <button class="mode" id="ping-fleet-btn" type="button">Ping Fleet Telemetry</button>
+    </div>
+
+    <div class="radar-grid">
+      <div class="radar-card">
+        <div class="radar-status">
+          <span><i class="status-dot dot-online"></i>ONLINE</span>
+          <span class="relay-ping" style="color:var(--lime-text)">14ms relay</span>
+        </div>
+        <div class="radar-city">Metropolis Gym</div>
+        <div class="radar-meta">Bandra West, Mumbai<br>248 punches today • HWM Synced</div>
+      </div>
+
+      <div class="radar-card">
+        <div class="radar-status">
+          <span><i class="status-dot dot-offline"></i>OFFLINE (4d)</span>
+          <span class="relay-ping" style="color:#F59F00">WAN Down</span>
+        </div>
+        <div class="radar-city">Iron Forge Athletic</div>
+        <div class="radar-meta">Indiranagar, Bengaluru<br>812 local outbox punches • 100% Verified</div>
+      </div>
+
+      <div class="radar-card">
+        <div class="radar-status">
+          <span><i class="status-dot dot-online"></i>ONLINE</span>
+          <span class="relay-ping" style="color:var(--lime-text)">18ms relay</span>
+        </div>
+        <div class="radar-city">Titan Athletics</div>
+        <div class="radar-meta">Connaught Place, Delhi<br>430 punches today • Nonce #218</div>
+      </div>
+
+      <div class="radar-card">
+        <div class="radar-status">
+          <span><i class="status-dot dot-sync"></i>SYNCING</span>
+          <span class="relay-ping" style="color:#38D9A9">124 Batch</span>
+        </div>
+        <div class="radar-city">Spartan Strength</div>
+        <div class="radar-meta">Jubilee Hills, Hyderabad<br>Uploading audit log • Idempotent</div>
+      </div>
+
+      <div class="radar-card">
+        <div class="radar-status">
+          <span><i class="status-dot dot-online"></i>ONLINE</span>
+          <span class="relay-ping" style="color:var(--lime-text)">12ms relay</span>
+        </div>
+        <div class="radar-city">Vanguard Studio</div>
+        <div class="radar-meta">Koregaon Park, Pune<br>192 punches today • Tamper None</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="hardware-matrix" id="specs">
+    <div class="sec-head">
+      <div>
+        <h2>Hardware &amp; Protocol Matrix.</h2>
+        <p>Zero rip-and-replace. Keep your existing &#8377;1.5L turnstiles and biometric terminals. Works with legacy 32-bit drivers, modern OSDP controllers, and any turnstile with a dry-contact relay.</p>
+      </div>
+    </div>
+
+    <div class="matrix-grid">
+      <div class="matrix-card">
+        <h3>Turnstiles &amp; Barriers</h3>
+        <ul>
+          <li><b>Optical Speed Gates</b>Tempered glass motorized swing barriers (&lt;250ms pulse).</li>
+          <li><b>Tripod Turnstiles</b>Heavy-duty mechanical/solenoid drop-arm stanchions.</li>
+          <li><b>Flap Barriers</b>Bi-directional retractable acrylic barriers for high-flow lobbies.</li>
+          <li><b>Magnetic Shear Locks</b>1200 lbs holding force fail-safe magnetic locks.</li>
+        </ul>
+      </div>
+
+      <div class="matrix-card">
+        <h3>Biometric Sensors</h3>
+        <ul>
+          <li><b>eSSL SilkBio Series</b>SilkID fingerprint + dual infrared facial geometry.</li>
+          <li><b>ZKTeco ProBio / SpeedFace</b>Visible light facial recognition + palm vein reader.</li>
+          <li><b>Hikvision MinMoe Series</b>Deep learning 3D facial recognition (&lt;0.2s matching).</li>
+          <li><b>Matrix COSEC VEGA</b>Multispectral optical sensor for wet, rough, or dirty hands.</li>
+        </ul>
+      </div>
+
+      <div class="matrix-card">
+        <h3>Protocols &amp; Buses</h3>
+        <ul>
+          <li><b>OSDP v2.2 (SIA Standard)</b>AES-128 encrypted bi-directional serial over RS-485.</li>
+          <li><b>Wiegand 26/34/66-bit</b>Universal legacy card reader pulse wire protocol.</li>
+          <li><b>TCP/IP Direct Sockets</b>Sub-millisecond push telemetry over local isolated VLAN.</li>
+          <li><b>Dry Contact Relay</b>Form-C NO/NC relay outputs with software debounce.</li>
+        </ul>
+      </div>
+
+      <div class="matrix-card">
+        <h3>Billing Engines</h3>
+        <ul>
+          <li><b>Razorpay Route</b>Automated multi-vendor settlement and fee splitting.</li>
+          <li><b>UPI Autopay Mandates</b>Seamless recurring monthly dues without credit cards.</li>
+          <li><b>Dynamic Payment Links</b>Instant SMS/WhatsApp grace collection triggers.</li>
+          <li><b>Monotonic Nonces</b>Zero double-charge and zero replay vulnerabilities.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <section class="end">
+    <h2>Stop babysitting the router.</h2>
+    <form class="demo" id="demo" novalidate>
+      <input name="name" placeholder="Your name" required autocomplete="name" aria-label="Your name">
+      <input name="gym_name" placeholder="Gym name" autocomplete="organization" aria-label="Gym name">
+      <input name="contact" placeholder="Phone or email" required autocomplete="email" aria-label="Phone or email">
+      <textarea name="message" rows="3" placeholder="How many gates? What hardware are they?" aria-label="Message"></textarea>
+      <input class="hp" name="website" tabindex="-1" autocomplete="off" aria-hidden="true">
+      <button class="btn" type="submit">Book a demo</button>
+      <p id="demo-msg" role="status"></p>
+    </form>
+    <footer><span>© 2026 BastionGate</span><span>Built for gyms in India, first.</span></footer>
+  </section>
+</main>
+
+<script>
+const strip = document.getElementById('days');
+const slider = document.getElementById('slider');
+const verdict = document.getElementById('verdict');
+for (let i = 0; i < 7; i++) strip.appendChild(document.createElement('i'));
+const cells = [...strip.children];
+const lines = [
+  'Online. Leases refresh in the background and nobody notices.',
+  'Offline a day. Front desk keeps working, punches pile up locally.',
+  'Two days. Members who pay still walk in. Lapsed ones don’t.',
+  'Day three. Router’s still dead. The doors don’t care.',
+  'Four days. Every punch is signed into the outbox, one UUID each.',
+  'Five days. Still checking people in, still taking payments.',
+  'Six days. Last full day on the current master lease.',
+  'Seven days. Running on the final stretch of the lease.',
+  'Day eight. The master lease lapses. Terminals disable themselves until the line is back and the gym is paid up.'
+];
+function paint(){
+  const d = +slider.value;
+  cells.forEach((c,i)=>{ c.className = d > 7 ? 'dead' : (i < d ? 'on' : '') });
+  document.getElementById('r-days').textContent = d;
+  document.getElementById('r-queue').textContent = (d*180).toLocaleString('en-IN');
+  document.getElementById('r-doors').textContent = d > 7 ? 'Locked' : 'Open';
+  verdict.textContent = lines[d];
+}
+slider.addEventListener('input', paint);
+paint();
+const modeBtn = document.getElementById('mode');
+const root = document.documentElement;
+const isLight = () => root.dataset.theme ? root.dataset.theme === 'light' : matchMedia('(prefers-color-scheme: light)').matches;
+const syncMode = () => {
+  const light = isLight();
+  modeBtn.textContent = light ? 'Dark' : 'Light';
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) metaTheme.setAttribute('content', light ? '#F4F3EF' : '#0A0A0C');
+};
+modeBtn.addEventListener('click', () => { root.dataset.theme = isLight() ? 'dark' : 'light'; syncMode(); });
+syncMode();
+
+(function() {
+  const scenBtns = document.querySelectorAll('.scen-btn');
+  const podLensL = document.getElementById('pod-lens');
+  const podLensR = document.getElementById('pod-lens-r');
+  const wingL = document.getElementById('wing-left');
+  const wingR = document.getElementById('wing-right');
+  const caption = document.getElementById('lane-caption');
+  const latency = document.getElementById('scan-latency');
+  const relay = document.getElementById('relay-indicator');
+
+  const c1Desc = document.getElementById('c1-desc');
+  const c1Badge = document.getElementById('c1-badge');
+  const c2Desc = document.getElementById('c2-desc');
+  const c2Badge = document.getElementById('c2-badge');
+  const c3Desc = document.getElementById('c3-desc');
+  const c3Badge = document.getElementById('c3-badge');
+  const c4Desc = document.getElementById('c4-desc');
+  const c4Badge = document.getElementById('c4-badge');
+  const c5Desc = document.getElementById('c5-desc');
+  const c5Badge = document.getElementById('c5-badge');
+
+  const setBadge = (el, type, text) => {
+    if (!el) return;
+    el.className = 'check-badge badge-' + type;
+    el.textContent = text;
+  };
+
+  const scenarios = {
+    valid: () => {
+      latency.textContent = '14.2ms';
+      caption.textContent = 'PASSAGE GRANTED: Barrier Open';
+      caption.style.color = 'var(--lime-text)';
+      relay.className = 'relay-pill pulse';
+      relay.textContent = 'RELAY 1: PULSED (250ms)';
+      setTimeout(() => { relay.className = 'relay-pill'; relay.textContent = 'RELAY 1: ARMED (READY)'; }, 1500);
+
+      podLensL.className = 'pod-lens active-green';
+      podLensR.className = 'pod-lens active-green';
+      wingL.className = 'glass-wing left-wing open-left';
+      wingR.className = 'glass-wing right-wing open-right';
+
+      c1Desc.textContent = 'Matches cloud public key (64-byte Ed25519)';
+      setBadge(c1Badge, 'pass', 'VERIFIED');
+      c2Desc.textContent = 'Terminal clock >= HWM timestamp; anti-rollback clear';
+      setBadge(c2Badge, 'pass', 'VERIFIED');
+      c3Desc.textContent = 'Facility master lease active; nonce #192 verified';
+      setBadge(c3Badge, 'pass', 'ACTIVE');
+      c4Desc.textContent = 'Active subscription; valid until 2026-10-31';
+      setBadge(c4Badge, 'pass', 'CLEARED');
+      c5Desc.textContent = 'Razorpay Route split settled; 0 balance overdue';
+      setBadge(c5Badge, 'pass', 'SETTLED');
+    },
+    grace: () => {
+      latency.textContent = '19.4ms';
+      caption.textContent = 'GRACE ENTRY GRANTED (+36h Unpaid): SMS Link Emitted';
+      caption.style.color = '#F59F00';
+      relay.className = 'relay-pill pulse';
+      relay.textContent = 'RELAY 1: PULSED (250ms)';
+      setTimeout(() => { relay.className = 'relay-pill'; relay.textContent = 'RELAY 1: ARMED (READY)'; }, 1500);
+
+      podLensL.className = 'pod-lens active-amber';
+      podLensR.className = 'pod-lens active-amber';
+      wingL.className = 'glass-wing left-wing open-left';
+      wingR.className = 'glass-wing right-wing open-right';
+
+      c1Desc.textContent = 'Valid Ed25519 signature from billing service';
+      setBadge(c1Badge, 'pass', 'VERIFIED');
+      c2Desc.textContent = 'Clock verified against monotonic HWM';
+      setBadge(c2Badge, 'pass', 'VERIFIED');
+      c3Desc.textContent = 'Gym lease active';
+      setBadge(c3Badge, 'pass', 'ACTIVE');
+      c4Desc.textContent = 'Inside 48-hour grace window (12h remaining)';
+      setBadge(c4Badge, 'warn', 'GRACE 48H');
+      c5Desc.textContent = 'Payment failed; Razorpay link plink_x dispatched';
+      setBadge(c5Badge, 'warn', 'DUE 3,200 INR');
+    },
+    expired: () => {
+      latency.textContent = '8.7ms';
+      caption.textContent = 'ACCESS REFUSED: Membership Lapsed (+50h)';
+      caption.style.color = 'var(--burnt)';
+      relay.className = 'relay-pill locked';
+      relay.textContent = 'RELAY 1: INTERCEPT / LOCKED';
+
+      podLensL.className = 'pod-lens active-red';
+      podLensR.className = 'pod-lens active-red';
+      wingL.className = 'glass-wing left-wing lock-deny';
+      wingR.className = 'glass-wing right-wing lock-deny';
+
+      c1Desc.textContent = 'Cryptographic signature intact';
+      setBadge(c1Badge, 'pass', 'VERIFIED');
+      c2Desc.textContent = 'Clock monotonic check passed';
+      setBadge(c2Badge, 'pass', 'VERIFIED');
+      c3Desc.textContent = 'Gym master lease alive';
+      setBadge(c3Badge, 'pass', 'ACTIVE');
+      c4Desc.textContent = 'Grace deadline passed; member lease lapsed';
+      setBadge(c4Badge, 'fail', 'EXPIRED');
+      c5Desc.textContent = 'Unpaid balance overdue; barrier locked';
+      setBadge(c5Badge, 'fail', 'OVERDUE');
+    },
+    rollback: () => {
+      latency.textContent = '3.1ms';
+      caption.textContent = 'TAMPER DETECTED: System Clock Rolled Back (-3 Hours)';
+      caption.style.color = 'var(--burnt)';
+      relay.className = 'relay-pill locked';
+      relay.textContent = 'EMERGENCY LOCKDOWN';
+
+      podLensL.className = 'pod-lens active-red';
+      podLensR.className = 'pod-lens active-red';
+      wingL.className = 'glass-wing left-wing lock-deny';
+      wingR.className = 'glass-wing right-wing lock-deny';
+
+      c1Desc.textContent = 'Signature evaluation aborted';
+      setBadge(c1Badge, 'fail', 'REJECTED');
+      c2Desc.textContent = 'Device clock (08:08 UTC) < High-Water Mark (11:08 UTC)';
+      setBadge(c2Badge, 'fail', 'ROLLBACK');
+      c3Desc.textContent = 'Facility security lockout invoked';
+      setBadge(c3Badge, 'fail', 'INTERCEPT');
+      c4Desc.textContent = 'Security incident logged to local outbox';
+      setBadge(c4Badge, 'fail', 'BLOCKED');
+      c5Desc.textContent = 'Tamper flag dispatched to cloud admin console';
+      setBadge(c5Badge, 'fail', 'FLAGGED');
+    },
+    offline: () => {
+      latency.textContent = '11.8ms';
+      caption.textContent = '100% OFFLINE PASSAGE: Day 5 Dark Mode';
+      caption.style.color = 'var(--lime-text)';
+      relay.className = 'relay-pill pulse';
+      relay.textContent = 'RELAY 1: PULSED (250ms)';
+      setTimeout(() => { relay.className = 'relay-pill'; relay.textContent = 'RELAY 1: ARMED (READY)'; }, 1500);
+
+      podLensL.className = 'pod-lens active-green';
+      podLensR.className = 'pod-lens active-green';
+      wingL.className = 'glass-wing left-wing open-left';
+      wingR.className = 'glass-wing right-wing open-right';
+
+      c1Desc.textContent = 'Ed25519 signature evaluated locally via public key';
+      setBadge(c1Badge, 'pass', 'OFFLINE OK');
+      c2Desc.textContent = 'Monotonic HWM incremented locally (0 drops)';
+      setBadge(c2Badge, 'pass', 'LOCAL HWM');
+      c3Desc.textContent = 'Master gym lease valid (2 days remaining)';
+      setBadge(c3Badge, 'pass', '7D CACHE');
+      c4Desc.textContent = 'Member credential alive in terminal memory';
+      setBadge(c4Badge, 'pass', 'LOCAL OK');
+      c5Desc.textContent = 'Punch queued into encrypted local SQLite outbox';
+      setBadge(c5Badge, 'pass', 'QUEUED');
+    }
+  };
+
+  scenBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      scenBtns.forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const s = btn.dataset.scenario;
+      if (scenarios[s]) scenarios[s]();
+    });
+  });
+
+  const pingBtn = document.getElementById('ping-fleet-btn');
+  if (pingBtn) {
+    pingBtn.addEventListener('click', () => {
+      pingBtn.textContent = 'Pinging Edge Nodes…';
+      pingBtn.disabled = true;
+      document.querySelectorAll('.radar-card').forEach((card, idx) => {
+        setTimeout(() => {
+          card.style.borderColor = 'var(--lime)';
+          setTimeout(() => { card.style.borderColor = ''; }, 600);
+        }, idx * 120);
+      });
+      setTimeout(() => {
+        pingBtn.textContent = 'Fleet Synced (0 Drops)';
+        setTimeout(() => { pingBtn.textContent = 'Ping Fleet Telemetry'; pingBtn.disabled = false; }, 2000);
+      }, 1000);
+    });
+  }
+})();
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+(function(){
+  if (!window.gsap || !window.ScrollTrigger || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  gsap.registerPlugin(ScrollTrigger);
+  const fine = matchMedia('(hover:hover) and (pointer:fine)').matches;
+
+  const h1 = document.querySelector('.hero h1');
+  if (h1) {
+    h1.setAttribute('aria-label', h1.textContent.trim());
+    h1.innerHTML = h1.textContent.trim().split(/\s+/).map(w => '<span class="w"><span>' + w + '</span></span>').join(' ');
+    gsap.from('.hero h1 .w>span', {yPercent:115, rotate:4, duration:1.1, ease:'expo.out', stagger:.07, delay:.15});
+  }
+  gsap.from('.hero .lede, .hero .row, .pull', {opacity:0, y:24, duration:.9, ease:'power3.out', stagger:.12, delay:.9});
+
+  const belt = gsap.to('.marquee div', {xPercent:-50, duration:38, ease:'none', repeat:-1});
+  ScrollTrigger.create({onUpdate: s => {
+    const v = gsap.utils.clamp(-6, 6, s.getVelocity() / 300);
+    gsap.to(belt, {timeScale: 1 + Math.abs(v), duration:.2, overwrite:true});
+    gsap.to(belt, {timeScale: 1, duration:1.2, delay:.2});
+  }});
+
+  gsap.to('.big', {yPercent:-18, scale:1.06, ease:'none', scrollTrigger:{trigger:'.big', start:'top bottom', end:'bottom top', scrub:true}});
+
+  ScrollTrigger.batch('.bento article, .gal-card, .radar-card, .matrix-card', {start:'top 88%', once:true,
+    onEnter: els => gsap.from(els, {opacity:0, y:36, duration:.7, ease:'power3.out', stagger:.08})});
+  gsap.from('.how li', {opacity:0, x:-24, duration:.7, stagger:.15, ease:'power2.out', scrollTrigger:{trigger:'.how ol', start:'top 80%'}});
+  gsap.from('.turnstile-sim', {opacity:0, y:40, duration:.8, ease:'power3.out', scrollTrigger:{trigger:'.turnstile-sim', start:'top 85%'}});
+  gsap.from('.end h2', {yPercent:30, opacity:0, duration:1, ease:'expo.out', scrollTrigger:{trigger:'.end', start:'top 75%'}});
+
+  if (!fine) return;
+  const ring = document.createElement('div');
+  ring.className = 'cur';
+  document.body.appendChild(ring);
+  const cx = gsap.quickTo(ring, 'x', {duration:.35, ease:'power3'});
+  const cy = gsap.quickTo(ring, 'y', {duration:.35, ease:'power3'});
+  addEventListener('pointermove', e => { ring.style.opacity = 1; cx(e.clientX); cy(e.clientY); });
+  document.addEventListener('pointerover', e => ring.classList.toggle('hot', !!e.target.closest('a, button, input')));
+
+  document.querySelectorAll('.btn').forEach(b => {
+    const mx = gsap.quickTo(b, 'x', {duration:.4, ease:'power3'});
+    const my = gsap.quickTo(b, 'y', {duration:.4, ease:'power3'});
+    b.addEventListener('pointermove', e => {
+      const r = b.getBoundingClientRect();
+      mx((e.clientX - r.left - r.width / 2) * .3);
+      my((e.clientY - r.top - r.height / 2) * .45);
+    });
+    b.addEventListener('pointerleave', () => { mx(0); my(0); });
+  });
+
+  document.querySelectorAll('.bento article, .pull, .gal-card, .matrix-card').forEach(c => {
+    gsap.set(c, {transformPerspective:900});
+    const rx = gsap.quickTo(c, 'rotationX', {duration:.5, ease:'power3'});
+    const ry = gsap.quickTo(c, 'rotationY', {duration:.5, ease:'power3'});
+    c.addEventListener('pointermove', e => {
+      if (e.target.closest('input, pre')) return;
+      const r = c.getBoundingClientRect();
+      ry(((e.clientX - r.left) / r.width - .5) * 7);
+      rx(-((e.clientY - r.top) / r.height - .5) * 7);
+    });
+    c.addEventListener('pointerleave', () => { rx(0); ry(0); });
+  });
+})();
+</script>
+<script>
+(function(){
+  const form = document.getElementById('demo');
+  const note = document.getElementById('demo-msg');
+  const metaApi = document.querySelector('meta[name="api-url"]');
+  const api = (metaApi ? metaApi.content : '').replace(/\/$/, '');
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const data = Object.fromEntries(new FormData(form));
+    const name = String(data.name || '').trim();
+    const contact = String(data.contact || '').trim();
+    if (!name || !contact) { note.textContent = 'Name and a phone or email, please.'; return; }
+
+    const endpoint = api ? (api + '/v1/leads') : '/v1/leads';
+    note.textContent = 'Sending…';
+    try {
+      const res = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (res.status === 429) throw new Error('Too many tries. Give it an hour.');
+      if (res.status === 404 && !api) {
+        const body = encodeURIComponent(name + ' / ' + (data.gym_name || '') + ' / ' + contact + '\n\n' + (data.message || ''));
+        location.href = 'mailto:hello@bastiongate.example?subject=Demo%20request&body=' + body;
+        note.textContent = 'Opening email client…';
+        return;
+      }
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).message || 'Something broke on our end.');
+      form.reset();
+      note.textContent = 'Got it. We’ll call you.';
+    } catch (err) {
+      if (!api && (err instanceof TypeError || (err && typeof err === 'object' && 'message' in err && String(err.message).includes('fetch')))) {
+        const body = encodeURIComponent(name + ' / ' + (data.gym_name || '') + ' / ' + contact + '\n\n' + (data.message || ''));
+        location.href = 'mailto:hello@bastiongate.example?subject=Demo%20request&body=' + body;
+        note.textContent = 'Opening email client…';
+        return;
+      }
+      note.textContent = (err && typeof err === 'object' && 'message' in err) ? String(err.message) : 'Couldn’t send. Try again.';
+    }
+  });
+})();
+</script>
+</body>
+</html>

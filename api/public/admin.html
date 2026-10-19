@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BastionGate console</title>
+<style>
+:root{--bg:#0A0A0C;--fg:#F4F3EF;--mute:rgba(244,243,239,.6);--line:rgba(244,243,239,.12);--card:#111114;--lime:#C6F432;--red:#E8590C;color-scheme:dark}
+@media(prefers-color-scheme:light){:root{--bg:#F4F3EF;--fg:#0A0A0C;--mute:rgba(10,10,12,.62);--line:rgba(10,10,12,.14);--card:#ECEAE3;color-scheme:light}}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;min-height:100vh}
+header{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:1rem 1.25rem;border-bottom:1px solid var(--line);flex-wrap:wrap}
+h1{font-size:1.2rem;font-weight:800;letter-spacing:-.02em}
+nav{display:flex;gap:.5rem;flex-wrap:wrap}
+button,input,textarea,select{font:inherit;color:inherit}
+button{background:none;border:1px solid var(--line);border-radius:999px;padding:.4rem .9rem;cursor:pointer}
+button:hover{border-color:var(--fg)}
+button.on,button.go{background:var(--lime);border-color:var(--lime);color:#0A0A0C;font-weight:600}
+button.bad{border-color:var(--red);color:var(--red)}
+input,textarea{width:100%;background:var(--card);border:1px solid var(--line);border-radius:6px;padding:.6rem .8rem}
+main{padding:1.25rem;max-width:1100px;margin:0 auto}
+.card{background:var(--card);border:1px solid var(--line);border-radius:6px;padding:1rem 1.1rem;margin-bottom:.8rem}
+.row{display:flex;justify-content:space-between;gap:1rem;align-items:center;flex-wrap:wrap}
+.mute{color:var(--mute);font-size:.85rem}
+.pill{font-size:.75rem;border:1px solid var(--line);border-radius:999px;padding:.1rem .55rem}
+.pill.ok{background:var(--lime);color:#0A0A0C;border-color:var(--lime)}
+.pill.warn{border-color:var(--red);color:var(--red)}
+.login{max-width:340px;margin:12vh auto;display:grid;gap:.7rem}
+.reply{border-left:2px solid var(--line);padding:.2rem .8rem;margin:.6rem 0}
+.reply.ADMIN{border-color:var(--lime)}
+#msg{color:var(--red);min-height:1.4em;font-size:.9rem}
+@media(max-width:640px){
+  header{padding:.8rem 1rem;gap:.6rem}
+  h1{font-size:1.1rem}
+  nav{gap:.4rem}
+  nav button{padding:.35rem .7rem;font-size:.85rem}
+  main{padding:.8rem}
+  .card{padding:.8rem .9rem;margin-bottom:.6rem}
+  .row{gap:.5rem}
+}
+</style>
+</head>
+<body>
+<header><h1>BastionGate console</h1><nav id="nav"></nav></header>
+<main id="main"></main>
+<script>
+(function () {
+  let token = sessionStorage.getItem('bg_token') || sessionStorage.getItem('lk_token');
+  let role = sessionStorage.getItem('bg_role') || sessionStorage.getItem('lk_role');
+  let tab = 'fleet';
+  const main = document.getElementById('main');
+  const nav = document.getElementById('nav');
+
+  function h(tag, props, ...kids) {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(props || {})) {
+      if (k === 'class') el.className = v;
+      else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v);
+    }
+    for (const kid of kids.flat()) if (kid != null) el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+    return el;
+  }
+
+  async function api(path, opts = {}) {
+    const res = await fetch('/v1' + path, {
+      method: opts.method || 'GET',
+      headers: Object.assign({ authorization: 'Bearer ' + token }, opts.body ? { 'content-type': 'application/json' } : {}),
+      body: opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+    if (res.status === 401) { logout(); throw new Error('Session ended'); }
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.message || 'Request failed (' + res.status + ')');
+    return data;
+  }
+
+  function logout() {
+    token = role = null;
+    sessionStorage.clear();
+    render();
+  }
+
+  const ago = s => s == null ? 'never' : s < 90 ? s + 's' : s < 5400 ? Math.round(s / 60) + 'm' : s < 172800 ? Math.round(s / 3600) + 'h' : Math.round(s / 86400) + 'd';
+  const when = iso => iso ? new Date(iso).toLocaleString() : 'none';
+
+  function renderNav() {
+    nav.replaceChildren();
+    if (!token) return;
+    for (const [id, label] of [['fleet', 'Fleet'], ['tickets', 'Tickets'], ['leads', 'Leads']]) {
+      nav.append(h('button', { class: tab === id ? 'on' : '', onclick: () => { tab = id; render(); } }, label));
+    }
+    nav.append(h('button', { onclick: logout }, 'Sign out (' + role + ')'));
+  }
+
+  function loginView() {
+    const msg = h('p', { id: 'msg' });
+    const email = h('input', { type: 'email', placeholder: 'Email', autocomplete: 'username' });
+    const pass = h('input', { type: 'password', placeholder: 'Password', autocomplete: 'current-password' });
+    const submit = async () => {
+      msg.textContent = '';
+      try {
+        const res = await fetch('/v1/auth/login', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: email.value, password: pass.value }) });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(res.status === 429 ? 'Too many attempts. Wait 15 minutes.' : 'Wrong email or password.');
+        token = data.token; role = data.role;
+        sessionStorage.setItem('bg_token', token); sessionStorage.setItem('bg_role', role);
+        render();
+      } catch (e) { msg.textContent = e.message; }
+    };
+    pass.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+    return h('div', { class: 'login' }, h('h1', {}, 'Sign in'), email, pass, h('button', { class: 'go', onclick: submit }, 'Sign in'), msg);
+  }
+
+  async function fleetView() {
+    const { tenants } = await api('/admin/fleet');
+    if (!tenants || !tenants.length) return h('p', { class: 'mute' }, 'No gyms yet.');
+    return tenants.map(t => {
+      const err = h('p', { id: 'msg' });
+      const act = (path, label, cls) => h('button', { class: cls, onclick: async () => {
+        if (!confirm(label + ' ' + t.name + '?')) return;
+        try { await api('/admin/tenants/' + t.id + '/' + path, { method: 'POST' }); render(); } catch (e) { err.textContent = e.message; }
+      } }, label);
+      return h('div', { class: 'card' },
+        h('div', { class: 'row' },
+          h('div', {}, h('strong', {}, t.name), ' ', h('span', { class: 'mute' }, t.id)),
+          h('div', {}, h('span', { class: 'pill ' + (t.status === 'ACTIVE' ? 'ok' : 'warn') }, t.status), ' ',
+            t.tamper_alerts_24h ? h('span', { class: 'pill warn' }, t.tamper_alerts_24h + ' tamper alerts / 24h') : null)),
+        h('p', { class: 'mute' }, 'Master lease until ' + when(t.master_lease_valid_until)),
+        (t.devices || []).map(d => h('p', { class: 'mute' }, d.label + ': last seen ' + ago(d.offline_seconds) + ' ago, backlog ' + (d.heartbeat && d.heartbeat.outbox_backlog != null ? d.heartbeat.outbox_backlog : 'unknown') + (d.heartbeat && d.heartbeat.tamper_flags && d.heartbeat.tamper_flags.length ? ', flags: ' + d.heartbeat.tamper_flags.join(', ') : ''))),
+        role === 'OWNER' ? h('div', { class: 'row' }, t.status === 'ACTIVE' ? act('suspend', 'Suspend', 'bad') : act('reinstate', 'Reinstate', 'go')) : null,
+        err);
+    });
+  }
+
+  async function ticketsView() {
+    const data = await api('/admin/tickets');
+    const tickets = Array.isArray(data?.tickets) ? data.tickets : [];
+    if (!tickets.length) return h('p', { class: 'mute' }, 'Inbox is empty.');
+    return tickets.map(t => h('div', { class: 'card' },
+      h('div', { class: 'row' },
+        h('div', {}, h('strong', {}, t.subject || '(no subject)'), ' ', h('span', { class: 'mute' }, t.tenant_name || t.tenant_id)),
+        h('div', {}, h('span', { class: 'pill ' + (t.sla_breached ? 'warn' : t.status === 'RESOLVED' ? 'ok' : '') }, t.sla_breached ? 'SLA breached' : t.status), ' ',
+          h('button', { onclick: () => openTicket(t.id) }, 'Open'))),
+      h('p', { class: 'mute' }, 'Due ' + when(t.sla_due_at))));
+  }
+
+  async function openTicket(id) {
+    const t = await api('/admin/tickets/' + id);
+    const text = h('textarea', { rows: '3', placeholder: 'Reply to the front desk' });
+    const resolve = h('input', { type: 'checkbox', style: 'width:auto' });
+    const err = h('p', { id: 'msg' });
+    const replies = Array.isArray(t?.replies) ? t.replies : [];
+    main.replaceChildren(
+      h('button', { onclick: render }, 'Back'),
+      h('h1', { style: 'margin:1rem 0 .3rem' }, (t?.subject || '(no subject)') + (t?.tenant_name ? ' · ' + t.tenant_name : '')),
+      h('p', { class: 'mute' }, (t?.status || '') + ', diagnostics: ' + JSON.stringify(t?.diagnostics || {})),
+      replies.map(r => h('div', { class: 'reply ' + r.author }, h('div', { class: 'mute' }, (r.author_label || r.author) + ' · ' + when(r.created_at)), h('div', {}, r.body))),
+      text,
+      h('div', { class: 'row', style: 'margin-top:.6rem' }, h('label', {}, resolve, ' Mark resolved'),
+        h('button', { class: 'go', onclick: async () => {
+          try { await api('/admin/tickets/' + id + '/reply', { method: 'POST', body: { body: text.value, resolve: resolve.checked } }); openTicket(id); } catch (e) { err.textContent = e.message; }
+        } }, 'Send reply')),
+      err);
+  }
+
+  async function leadsView() {
+    const data = await api('/admin/leads');
+    const leads = Array.isArray(data?.leads) ? data.leads : [];
+    if (!leads.length) return h('p', { class: 'mute' }, 'No demo requests yet.');
+    return leads.map(l => h('div', { class: 'card' },
+      h('div', { class: 'row' }, h('strong', {}, l.name + (l.gym_name ? ' — ' + l.gym_name : '')), h('span', { class: 'mute' }, when(l.created_at))),
+      h('p', {}, l.contact), l.message ? h('p', { class: 'mute' }, l.message) : null));
+  }
+
+  async function render() {
+    renderNav();
+    if (!token) { main.replaceChildren(loginView()); return; }
+    try {
+      const view = tab === 'fleet' ? await fleetView() : tab === 'tickets' ? await ticketsView() : await leadsView();
+      main.replaceChildren(...[view].flat());
+    } catch (e) { if (token) main.replaceChildren(h('p', { id: 'msg' }, e.message)); }
+  }
+
+  render();
+})();
+</script>
+</body>
+</html>

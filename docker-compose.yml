@@ -1,0 +1,48 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: latchkey_owner
+      POSTGRES_PASSWORD: owner-pass
+      POSTGRES_DB: latchkey
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./api/scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports: ["5432:5432"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U latchkey_owner -d latchkey"]
+      interval: 3s
+      retries: 20
+  redis:
+    image: redis:7
+    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 3s
+      retries: 20
+  migrate:
+    build: ./api
+    command: ["node", "dist/scripts/migrate.js"]
+    environment:
+      MIGRATE_DATABASE_URL: postgres://latchkey_owner:owner-pass@postgres:5432/latchkey
+    depends_on:
+      postgres: { condition: service_healthy }
+  api:
+    build: ./api
+    ports: ["3000:3000"]
+    environment:
+      DATABASE_URL: postgres://latchkey_app:app-pass@postgres:5432/latchkey
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env (32+ characters)}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-}
+      KMS_KEY_ID: ${KMS_KEY_ID:-}
+      AWS_REGION: ${AWS_REGION:-ap-south-1}
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
+      TRUST_PROXY: ${TRUST_PROXY:-false}
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      redis: { condition: service_healthy }
+volumes:
+  pgdata:

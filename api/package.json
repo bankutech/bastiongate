@@ -1,0 +1,36 @@
+{
+  "name": "bastiongate-api",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/src/main.js",
+    "dev": "tsc -p tsconfig.json && node --watch dist/src/main.js",
+    "migrate": "tsx scripts/migrate.ts",
+    "migrate:prod": "node dist/scripts/migrate.js",
+    "test": "tsx --test src/lease/verify.test.ts src/lease/crypto.test.ts src/lease/canonical.test.ts src/admin/jwt.test.ts src/admin/password.test.ts",
+    "test:unit": "npm test",
+    "e2e": "bash scripts/run-e2e.sh",
+    "smoke": "tsx scripts/smoke.ts"
+  },
+  "dependencies": {
+    "@aws-sdk/client-kms": "^3.600.0",
+    "@nestjs/common": "^11.2.7",
+    "@nestjs/core": "^11.2.7",
+    "@nestjs/platform-fastify": "^11.2.7",
+    "bullmq": "^6.3.16",
+    "ioredis": "^6.0.0",
+    "pg": "^8.12.0",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/pg": "^8.11.6",
+    "tsx": "^4.16.0",
+    "typescript": "^5.5.0"
+  },
+  "overrides": {
+    "fastify": "^5.12.7"
+  }
+}

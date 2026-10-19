@@ -1,0 +1,10 @@
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'latchkey_app') THEN
+    CREATE ROLE latchkey_app LOGIN PASSWORD 'app-pass';
+  END IF;
+END $$;
+GRANT CONNECT ON DATABASE latchkey TO latchkey_app;
+GRANT USAGE ON SCHEMA public TO latchkey_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE latchkey_owner IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO latchkey_app;
+ALTER DEFAULT PRIVILEGES FOR ROLE latchkey_owner IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO latchkey_app;
